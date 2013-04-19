@@ -1,12 +1,3 @@
-/*******************************************************
-*	这是配合我的博客《JRTPLIB@Conference DIY视频会议系统》
-*	而写的一个阶段性实验。
-*	作者：冯富秋 tinnal
-*	邮箱：tinnal@163.com
-*	博客：www.cnitblog.com/tinnal/
-*	目期：2009-01-03
-*	版本：1.00
-*********************************************************/
 
 #include "stdio.h"
 #include "string.h"
@@ -26,30 +17,35 @@ int main(int argc, char **argv)
 	FILE *wav_out;
 	U32 i;
 	U8	has_fact_block =0;
-
+	int head_with=58;//文件头的默认大小
 	unsigned char pcm_bytes[2];
 	short pcm;
 	unsigned char a_law;	
-
+	char* output_temp;
 	long file_pos;
 
-	if(argc != 3 )
+	if((argc != 3) && (argc != 4) )
 	{
-		printf("Usage:\n\t%s <intput file> <output file>\n", argv[0]);
+		printf("Usage:\n\t%s <intput file> <seconds> [output file]\n", argv[0]);
 		exit(-1);
 	}
-
-	wav_in = fopen(argv[1],"rb");
+	if(argc == 3)
+	{
+		argv[3]="a"
+	}
+	output_temp=argv[3];
+	
+	wav_in = openWav(argv[1]);
 	if(wav_in == NULL)
 	{
 		printf("Can't open input file %s\n", argv[1]);
 		return (-1);
 	}
 
-	wav_out = fopen(argv[2], "wb");
+	wav_out = fopen(output_temp, "wb");
 	if( wav_out == NULL)
 	{
-		printf("Can't open output file %s\n",argv[2]);
+		printf("Can't open output file %s\n",argv[3]);
 		fclose(wav_in);
 		return(-1);
 	}
@@ -83,13 +79,15 @@ int main(int argc, char **argv)
 			"\t 2. Samples Rate:  8000 KHz \n"
 			"\t 3. Channels:      one channel \n"
 			"\t 4. BitsPerSample: 16 \n");
+	if(fmt_block.dwFmtSize != 16)
+	{
 		fclose(wav_in);
 		fclose(wav_out);
-		return(-1);
+		return(-1);	
+	}
+	head_with-=2;
 	}
 	
-	file_pos = ftell(wav_in);
-
 	//Try to read FACT_BLOCK
 	file_pos = ftell(wav_in);
 	fread(&fact_block, sizeof(struct FACT_BLOCK), 1, wav_in);
@@ -99,7 +97,10 @@ int main(int argc, char **argv)
 		fread(&fack_block_buffer, fact_block.dwFactSize, 1, wav_in);
 	}
 	else
+	{
+		head_with -= 12;
 		fseek(wav_in, file_pos, SEEK_SET);
+	}
 	
 	fread(&data_block, sizeof(struct DATA_BLOCK), 1, wav_in);
 	if (memcmp(data_block.szDataID, "data", 4) != 0)
@@ -109,7 +110,9 @@ int main(int argc, char **argv)
 		fclose(wav_out);
 		return(-1);
 	}
-
+	double time_sum=(data_block.dwDataSize-head_with)/fmt_block.wavFormat.dwAvgBytesPerSec;
+	printf("%ld",time_sum);
+	exit(0);
 	//Change the wave header to write
 	riff_header.dwRiffSize					-=	data_block.dwDataSize/2 ;
 	
